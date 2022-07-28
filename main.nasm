@@ -1,170 +1,104 @@
 global test_loop
-global test_movs
-global test_loop_8s
-global test_movs_8s
-global test_opt
+global test_loopq
+global test_repstosb
+global test_repstosq
 
 test_loop:
-    enter 0, 0
     ; rdi - dst
-    ; rsi - src
-    ; rdx - c
-    
-    ; rax - tmp
-
-.loop:
-    cmp rdx, 0
-    jle .end
-
-    mov al, byte [rsi]
-    mov [rdi], al
-
-    dec rdx
-    inc rdi
-    inc rsi
-    jmp .loop
-.end:
-    leave
-    ret
-
-test_movs:
+    ; rsi - byte
+    ; rdx - count
     enter 0, 0
-    ; rdi - dst
-    ; rsi - src
-    ; rdx - c
-
-    ; store rcx
-    mov rax, rcx
-    
-    mov ecx, edx
-    mov rcx, rdx
-    rep movsb
-
-    ; restore rcx
-    mov rcx, rax
-
-    leave
-    ret
-
-test_loop_8s:
-    enter 0, 0
-    ; rdi - dst
-    ; rsi - src
-    ; rdx - c
-
-    ; write whole eight
-.loop_1:
-    sub rdx, 8
-    cmp rdx, 0
-    jl .end_loop_1
-
-    mov rax, [rsi]
-    mov [rdi], rax
-
-    add rsi, 8
-    add rdi, 8
-
-    jmp .loop_1
-.end_loop_1:
-    ; exit on zero
+    mov rax, rsi
+.start:
     cmp rdx, 0
     je .end
-    add rdx, 8
-    ; write rest
-.loop_2:
-    cmp rdx, 0
-    jle .end
-    
-    mov al, byte [rsi]
-    mov [rdi], al
 
-    dec rdx
+    mov BYTE [rdi], al
     inc rdi
-    inc rsi
-    jmp .loop_2
+    dec rdx
+
+    jmp .start
 .end:
+
     leave
     ret
 
-test_movs_8s:
-    enter 0, 0
+test_loopq:
     ; rdi - dst
-    ; rsi - src
-    ; rdx - c
+    ; rsi - byte
+    ; rdx - count
+    enter 0, 0
+    mov rax, rsi
 
-    ;and rax, 7
+    ; do single loop
+.start_small:
+    test rdx, 7
+    jz .end_small
 
-    ; handle <8
-.loop_1:
-    mov rax, rdx
-    and rax, 7
-    cmp rax, 0
-    jle .end_loop_1
-
-    mov al, byte [rsi]
-    mov [rdi], al
-
-    dec rdx
+    mov BYTE [rdi], al
     inc rdi
-    inc rsi
-    jmp .loop_1
-.end_loop_1:
-    ; check zero, calc new count
-    cmp rdx, 0
-    je .end
+    dec rdx
+
+    jmp .start_small
+.end_small:
     shr rdx, 3
-
-    ; store rcx
-    mov rax, rcx
     
-    mov ecx, edx
-    mov rcx, rdx
-    rep movsq
+    ; extend rax
+    shr rsi, 8
+    or rax, rsi
+    shr rsi, 8
+    or rax, rsi
+    shr rsi, 8
+    or rax, rsi
 
-    ; restore rcx
-    mov rcx, rax
+    ; do 8 loop
+.start:
+    cmp rdx, 0
+    je .end
+
+    mov QWORD [rdi], rax
+    inc rdi
+    dec rdx
+
+    jmp .start
 .end:
+
     leave
     ret
 
-test_opt:
-    ; rdi - dst
-    ; rsi - src
-    ; rdx - c
-    cmp rdx, 8
-    jl .small
-
-    cmp rdx, 256
-    jge .call_movs_8s
-.call_loop_8s:
-    jmp test_loop_8s
-    jmp .end
-.call_movs_8s:
-    jmp test_movs_8s
-    jmp .end
-
-.small:
+test_repstosb:
     enter 0, 0
 
-    test    rdx, 4
-    je      .L2
-    mov     eax, DWORD [rsi]
-    add     rdi, 4
-    add     rsi, 4
-    mov     DWORD [rdi-4], eax
-.L2:
-    test    rdx, 2
-    je      .L3
-    movzx   eax, WORD [rsi]
-    add     rdi, 2
-    add     rsi, 2
-    mov     WORD [rdi-2], ax
-.L3:
-    and     rdx, 1
-    je      .L1
-    movzx   eax, BYTE [rsi]
-    mov     BYTE [rdi], al
-.L1:
+    ; rdi - dst
+    ; rsi - byte
+    ; rdx - count
+
+    mov rax, rsi
+    mov r8, rcx
+    mov rcx, rdx
+
+    rep stosb
+
+    mov rcx, r8
+
     leave
-.end:
+    ret
+
+test_repstosq:
+    enter 0, 0
+
+    mov rax, rsi
+    mov r8, rcx
+
+    mov rcx, rdx
+    and rcx, 7
+    rep stosb
+
+    mov rcx, rdx
+    shr rcx, 3
+    rep stosq
+
+    mov rcx, r8
+
+    leave
     ret
